@@ -1,9 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/calendar", "destination": "/steady-calendar.html" },
-    { "source": "/log",      "destination": "/steady-log.html" },
-    { "source": "/stretch",  "destination": "/steady-stretch.html" },
-    { "source": "/memo",     "destination": "/steady-memo.html" }
-  ]
-}
