@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Steady</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Steady">
+  <link rel="apple-touch-icon" href="/icon-512.png">
+  <meta name="theme-color" content="#4a3420">
+  <meta name="mobile-web-app-capable" content="yes">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=DM+Mono:wght@300;400;500&family=Geist:wght@400;600;700;800&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ivory:      #f5f0e8;
+    --ivory-mid:  #ede5d8;
+    --ivory-deep: #e2d8c8;
+    --ivory-dark: #cbbea8;
+    --wood-mid:   #a8845a;
+    --wood-dark:  #7a5c38;
+    --bark:       #4a3420;
+    --text-soft:  #b09070;
+    --text-xsoft: #cfc0a8;
+  }
+  html, body { height: 100%; background: #ddd5c4; }
+  .app { max-width: 390px; min-height: 100vh; margin: 0 auto; background: var(--ivory); display: flex; flex-direction: column; }
+
+  /* ── 헤더 ── */
+  .header {
+    padding: 52px 20px 14px;
+    background: var(--ivory);
+    border-bottom: 1px solid var(--ivory-deep);
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+  }
+  .wordmark {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px; font-weight: 600; font-style: italic;
+    color: var(--bark); letter-spacing: -0.02em;
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .wordmark-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: linear-gradient(155deg, #5a3e24, #2e1f10);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 8px rgba(46,31,16,0.3); flex-shrink: 0;
+  }
+  .legend { display: flex; gap: 10px; align-items: center; padding-bottom: 2px; }
+  .legend-item {
+    display: flex; align-items: center; gap: 4px;
+    font-family: 'Geist', sans-serif; font-size: 8px; color: var(--text-soft);
+  }
+  .legend-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+  .scroll { flex: 1; overflow-y: auto; padding-bottom: 40px; }
+  .week-section { padding: 14px 16px 0; }
+  .week-divider { margin: 28px 16px 0; border: none; border-top: 1px solid var(--ivory-deep); }
+
+  /*
+    rows:
+      1: 요일   18px
+      2: 날짜   20px
+      3: 점 행   6px  ← 날짜-슬롯 사이, 생리점 위치
+      4: gap     3px
+      5: 오전   24px
+      6: 오후   24px
+      7: 저녁   24px
+  */
+  .cal-grid {
+    display: grid;
+    grid-template-columns: 38px repeat(7, 1fr);
+    grid-template-rows: 18px 20px 6px 3px 24px 24px 24px 6px;
+    column-gap: 3px;
+    row-gap: 2px;
+  }
+
+  .week-label {
+    grid-column: 1; grid-row: 2;
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;
+    font-family: 'Geist', sans-serif; font-size: 11px; font-weight: 600; font-style: italic;
+    color: var(--text-soft); line-height: 1;
+  }
+  /* col1 row3+4 — 빈칸 */
+  .dd-spacer { grid-column: 1; grid-row: 3 / 5; }
+
+  .dn {
+    grid-row: 1;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Geist', sans-serif; font-size: 10px; font-weight: 500;
+    color: var(--text-soft); border-bottom: 1px solid var(--ivory-deep);
+  }
+  .dn.tc { color: var(--bark); font-weight: 700; }
+
+  .dd {
+    grid-row: 2;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Geist', sans-serif; font-size: 11px; font-weight: 600;
+    color: var(--text-soft); border-radius: 6px;
+  }
+  .dd.today { background: var(--bark); color: var(--ivory); font-weight: 800; }
+
+  /* 생리 점 — row3, 4px 빨간 원 */
+  .pd {
+    grid-row: 3;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pd-dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: #c0392b; opacity: 0; transition: opacity 0.2s;
+  }
+  .pd-dot.on { opacity: 1; }
+
+  .tl {
+    grid-column: 1;
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;
+    font-family: 'Noto Sans KR', sans-serif; font-size: 9px; font-weight: 400;
+    color: var(--text-soft); letter-spacing: -0.02em;
+  }
+
+  /* ── 슬롯 ── */
+  .sl {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 5px; cursor: pointer; transition: filter 0.12s;
+    border: 1.5px solid transparent; overflow: hidden;
+  }
+  .sl:hover { filter: brightness(0.93); }
+  .sl-txt {
+    font-family: 'Noto Sans KR', sans-serif; font-size: 8px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding: 0; line-height: 1;
+    letter-spacing: -0.06em;
+    display: block;
+    width: 100%; text-align: center;
+  }
+  .sl.default  { background: var(--ivory-mid); border-color: var(--ivory-deep); }
+  /* work: 배경/테두리 없이 연한 글씨 */
+  .sl.work     { background: transparent; border-color: transparent; }
+  .sl.work .sl-txt { color: #8a7060; font-weight: 500; }
+  /* plans: 배경/테두리 없이 진한 글씨 (work와 구별) */
+  .sl.plans    { background: transparent; border-color: transparent; }
+  .sl.plans .sl-txt { color: var(--text-soft); font-weight: 400; }
+  .sl.cardio   { background: rgba(180,100,60,0.14); border-color: rgba(180,100,60,0.48); }
+  .sl.cardio .sl-txt { color: #8b4a20; font-weight: 700; }
+  .sl.strength { background: rgba(44,74,50,0.14); border-color: rgba(44,74,50,0.42); }
+  .sl.strength .sl-txt { color: #2c4a32; font-weight: 700; }
+  .sl.recovery { background: rgba(80,100,140,0.11); border-color: rgba(80,100,140,0.36); }
+  .sl.recovery .sl-txt { color: #3a4e6e; font-weight: 700; }
+
+
+
+  /* ── 탭바 ── */
+  .tabbar {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 390px; z-index: 25;
+    background: rgba(245,240,232,0.96);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid #e2d8c8;
+    padding: 14px 8px 28px;
+    display: flex; justify-content: space-around; align-items: center;
+  }
+  .tab-item {
+    display: flex; align-items: center; justify-content: center;
+    flex: 1; cursor: pointer; padding: 4px;
+    border-radius: 10px;
+  }
+  .tab-item svg { width: 28px; height: 28px; stroke: #cbbea8; fill: none; }
+  .tab-item svg circle { fill: #cbbea8; stroke: none; }
+  .tab-item.active svg { stroke: #4a3420; }
+  .tab-item.active svg circle { fill: #4a3420; }
+
+  /* ── 다중선택 모드 ── */
+  .sl.selected {
+    outline: 2px solid #4a3420;
+    outline-offset: -2px;
+    position: relative;
+  }
+  .sl.selected::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(74,52,32,0.12);
+    border-radius: 4px;
+    pointer-events: none;
+  }
+
+  .multiselect-bar {
+    display: none;
+    position: sticky; top: 0; z-index: 15;
+    background: #4a3420;
+    padding: 9px 20px;
+    align-items: center; justify-content: space-between;
+  }
+  .multiselect-bar.on { display: flex; }
+  .ms-label {
+    font-family: 'Geist', sans-serif;
+    font-size: 13px; font-weight: 600; color: #f5f0e8;
+    letter-spacing: -0.01em;
+  }
+  .ms-cancel {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: rgba(245,240,232,0.6);
+    letter-spacing: 0.08em; cursor: pointer;
+    background: none; border: none; padding: 0;
+  }
+  .ms-enter {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 11px; font-weight: 600; color: #4a3420;
+    background: #f5f0e8; border: none;
+    padding: 4px 12px; border-radius: 8px;
+    cursor: pointer;
+  }
+
+  /* 다중선택 모드: 생리버튼 숨김 */
+  .sheet.multi .period-toggle { display: none; }
+  .sheet.multi .sheet-date { color: var(--text-soft); }
+
+
+  /* ── + 슬롯 (저녁 이후 추가 활동) ── */
+  .sl-plus {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+    transition: all 0.15s;
+  }
+  .sl-plus:hover { background: var(--ivory-mid); border-color: var(--ivory-deep); }
+  .sl-plus-txt {
+    font-size: 10px; color: var(--text-xsoft);
+    line-height: 1; font-weight: 300;
+  }
+  /* + 슬롯에 내용 있을 때 — 기존 슬롯과 동일 음영, 테두리 얇게 */
+  .sl-plus.cardio   { background: rgba(180,100,60,0.10); border-color: rgba(180,100,60,0.2); }
+  .sl-plus.strength { background: rgba(44,74,50,0.10);   border-color: rgba(44,74,50,0.2); }
+  .sl-plus.recovery { background: rgba(80,100,140,0.08); border-color: rgba(80,100,140,0.2); }
+  .sl-plus.cardio   .sl-plus-txt { color: #8b4a20; font-size: 8px; font-weight: 600; }
+  .sl-plus.strength .sl-plus-txt { color: #2c4a32; font-size: 8px; font-weight: 600; }
+  .sl-plus.recovery .sl-plus-txt { color: #3a4e6e; font-size: 8px; font-weight: 600; }
+
+  /* ── 바텀 시트 ── */
+  .sheet-overlay { display: none; position: fixed; inset: 0; z-index: 30; background: rgba(46,31,16,0.18); }
+  .sheet-overlay.open { display: block; }
+
+  .sheet {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 390px; z-index: 40;
+    background: var(--ivory); border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--ivory-deep);
+    box-shadow: 0 -8px 40px rgba(46,31,16,0.14);
+    padding: 14px 20px 36px;
+    display: none; flex-direction: column; gap: 0;
+  }
+  .sheet.open { display: flex; }
+
+  .sheet-handle { width: 32px; height: 3px; border-radius: 2px; background: var(--ivory-dark); margin: 0 auto 12px; }
+
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+
+  /* 생리 토글 — 왼쪽, 작은 원형 버튼 */
+  .period-toggle {
+    width: 22px; height: 22px; border-radius: 50%;
+    border: 1.5px solid #c0392b; background: transparent;
+    cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+    margin-left: 8px;
+  }
+  .period-toggle .dot-inner {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: transparent; transition: background 0.15s;
+  }
+  .period-toggle.active { background: #c0392b; }
+  .period-toggle.active .dot-inner { background: #fff; }
+
+  .sheet-date { font-family: 'Geist', sans-serif; font-size: 14px; font-weight: 700; color: var(--bark); letter-spacing: -0.02em; line-height: 1; }
+  .sheet-time { font-family: 'Noto Sans KR', sans-serif; font-size: 11px; color: var(--text-soft); margin-top: 3px; }
+
+  .sheet-actions {
+    display: flex; align-items: center; gap: 6px;
+  }
+  /* 생리버튼과 체크버튼 사이 간격 넓게 */
+  .period-toggle + .sheet-btn.confirm { margin-left: 10px; }
+  .sheet-btn {
+    width: 28px; height: 28px; border-radius: 50%; border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 13px; transition: background 0.15s;
+  }
+  .sheet-btn.confirm { background: var(--bark); color: var(--ivory); }
+  .sheet-btn.confirm:hover { background: var(--wood-dark); }
+  .sheet-btn.cancel  { background: var(--ivory-deep); color: var(--text-soft); }
+  .sheet-btn.cancel:hover { background: var(--ivory-dark); }
+
+  .sheet-row { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--ivory-deep); min-height: 54px; }
+  .sheet-row-label { font-family: 'Geist', sans-serif; font-size: 11px; font-weight: 700; color: var(--bark); }
+  .sheet-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sheet-row.hidden { display: none; }
+
+  .chip {
+    padding: 0 8px; border-radius: 7px;
+    height: 28px; font-family: 'Noto Sans KR', sans-serif;
+    font-size: 10px; font-weight: 500; color: var(--bark);
+    background: var(--ivory-mid); border: 1.5px solid var(--ivory-deep);
+    cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .chip:hover { background: var(--ivory-deep); }
+  .chip.sel-booked   { background: var(--ivory-dark); border-color: var(--ivory-dark); font-weight: 600; }
+  .chip.sel-free     { background: var(--bark); border-color: var(--bark); color: var(--ivory); font-weight: 600; }
+  .chip.sel-work     { background: transparent; border-color: transparent; color: #8a7060; font-weight: 500; }
+  .chip.sel-plans    { background: transparent; border-color: transparent; color: var(--text-soft); font-weight: 400; }
+  .chip.sel-cardio   { background: rgba(180,100,60,0.18); border-color: rgba(180,100,60,0.5);  color: #8b4a20; font-weight: 700; }
+  .chip.sel-strength { background: rgba(44,74,50,0.16);  border-color: rgba(44,74,50,0.45);   color: #2c4a32; font-weight: 700; }
+  .chip.sel-recovery { background: rgba(80,100,140,0.13);border-color: rgba(80,100,140,0.38); color: #3a4e6e; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="header">
+    <div class="wordmark">
+      <div class="wordmark-icon" style="background:none;box-shadow:none;padding:0;"><img src="data:image/png;base64,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" style="width:28px;height:28px;border-radius:7px;object-fit:cover;display:block;"></div>
+      Steady
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(180,100,60,0.18);border:1.5px solid rgba(180,100,60,0.5)"></div>Cardio</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(44,74,50,0.16);border:1.5px solid rgba(44,74,50,0.45)"></div>Strength</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(80,100,140,0.13);border:1.5px solid rgba(80,100,140,0.38)"></div>Recovery</div>
+    </div>
+  </div>
+
+  <div class="scroll" style="padding-bottom:120px">
+    <div class="multiselect-bar" id="ms-bar">
+      <span class="ms-label" id="ms-label">0개 선택됨</span>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button class="ms-enter" onclick="openMultiSheet()">입력</button>
+        <button class="ms-cancel" onclick="exitMultiSelect()">취소</button>
+      </div>
+    </div>
+
+    <!-- ══ WEEK 0 (전주) ══ -->
+    <div class="week-section">
+      <div class="cal-grid">
+        <div class="week-label" id="wlabel-0">W00</div>
+        <div class="dd-spacer"></div>
+        <div class="tl" style="grid-row:5">오전</div>
+        <div class="tl" style="grid-row:6">오후</div>
+        <div class="tl" style="grid-row:7">저녁</div>
+
+        <div class="dn" id="dn-0-0" style="grid-column:2">일</div>
+        <div class="dn" id="dn-0-1" style="grid-column:3">월</div>
+        <div class="dn" id="dn-0-2" style="grid-column:4">화</div>
+        <div class="dn" id="dn-0-3" style="grid-column:5">수</div>
+        <div class="dn" id="dn-0-4" style="grid-column:6">목</div>
+        <div class="dn" id="dn-0-5" style="grid-column:7">금</div>
+        <div class="dn" id="dn-0-6" style="grid-column:8">토</div>
+
+        <div class="dd" id="dd-0-0" style="grid-column:2">-</div>
+        <div class="dd" id="dd-0-1" style="grid-column:3">-</div>
+        <div class="dd" id="dd-0-2" style="grid-column:4">-</div>
+        <div class="dd" id="dd-0-3" style="grid-column:5">-</div>
+        <div class="dd" id="dd-0-4" style="grid-column:6">-</div>
+        <div class="dd" id="dd-0-5" style="grid-column:7">-</div>
+        <div class="dd" id="dd-0-6" style="grid-column:8">-</div>
+
+        <div class="pd" style="grid-column:2"><div class="pd-dot" id="pd-0-0"></div></div>
+        <div class="pd" style="grid-column:3"><div class="pd-dot" id="pd-0-1"></div></div>
+        <div class="pd" style="grid-column:4"><div class="pd-dot" id="pd-0-2"></div></div>
+        <div class="pd" style="grid-column:5"><div class="pd-dot" id="pd-0-3"></div></div>
+        <div class="pd" style="grid-column:6"><div class="pd-dot" id="pd-0-4"></div></div>
+        <div class="pd" style="grid-column:7"><div class="pd-dot" id="pd-0-5"></div></div>
+        <div class="pd" style="grid-column:8"><div class="pd-dot" id="pd-0-6"></div></div>
+
+        <div class="sl default" id="sl-0-0-5" style="grid-column:2;grid-row:5"></div>
+        <div class="sl default" id="sl-0-1-5" style="grid-column:3;grid-row:5"></div>
+        <div class="sl default" id="sl-0-2-5" style="grid-column:4;grid-row:5"></div>
+        <div class="sl default" id="sl-0-3-5" style="grid-column:5;grid-row:5"></div>
+        <div class="sl default" id="sl-0-4-5" style="grid-column:6;grid-row:5"></div>
+        <div class="sl default" id="sl-0-5-5" style="grid-column:7;grid-row:5"></div>
+        <div class="sl default" id="sl-0-6-5" style="grid-column:8;grid-row:5"></div>
+
+        <div class="sl default" id="sl-0-0-6" style="grid-column:2;grid-row:6"></div>
+        <div class="sl default" id="sl-0-1-6" style="grid-column:3;grid-row:6"></div>
+        <div class="sl default" id="sl-0-2-6" style="grid-column:4;grid-row:6"></div>
+        <div class="sl default" id="sl-0-3-6" style="grid-column:5;grid-row:6"></div>
+        <div class="sl default" id="sl-0-4-6" style="grid-column:6;grid-row:6"></div>
+        <div class="sl default" id="sl-0-5-6" style="grid-column:7;grid-row:6"></div>
+        <div class="sl default" id="sl-0-6-6" style="grid-column:8;grid-row:6"></div>
+
+        <div class="sl default" id="sl-0-0-7" style="grid-column:2;grid-row:7"></div>
+        <div class="sl default" id="sl-0-1-7" style="grid-column:3;grid-row:7"></div>
+        <div class="sl default" id="sl-0-2-7" style="grid-column:4;grid-row:7"></div>
+        <div class="sl default" id="sl-0-3-7" style="grid-column:5;grid-row:7"></div>
+        <div class="sl default" id="sl-0-4-7" style="grid-column:6;grid-row:7"></div>
+        <div class="sl default" id="sl-0-5-7" style="grid-column:7;grid-row:7"></div>
+        <div class="sl default" id="sl-0-6-7" style="grid-column:8;grid-row:7"></div>
+
+        <!-- + 슬롯 row8 -->
+        <div style="grid-column:1;grid-row:8"></div>
+        <div class="sl-plus" id="sl-0-0-8" style="grid-column:2;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-0-1-8" style="grid-column:3;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-0-2-8" style="grid-column:4;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-0-3-8" style="grid-column:5;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-0-4-8" style="grid-column:6;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-0-5-8" style="grid-column:7;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-0-6-8" style="grid-column:8;grid-row:8"><span class="sl-plus-txt">+</span></div>
+      </div>
+    </div>
+
+    <hr class="week-divider">
+
+    <!-- ══ WEEK 1 ══ -->
+    <div class="week-section">
+      <div class="cal-grid">
+        <div class="week-label" id="wlabel-1">W00</div>
+        <div class="dd-spacer"></div>
+        <div class="tl" style="grid-row:5">오전</div>
+        <div class="tl" style="grid-row:6">오후</div>
+        <div class="tl" style="grid-row:7">저녁</div>
+
+        <div class="dn" id="dn-1-0" style="grid-column:2">일</div>
+        <div class="dn" id="dn-1-1" style="grid-column:3">월</div>
+        <div class="dn" id="dn-1-2" style="grid-column:4">화</div>
+        <div class="dn" id="dn-1-3" style="grid-column:5">수</div>
+        <div class="dn" id="dn-1-4" style="grid-column:6">목</div>
+        <div class="dn" id="dn-1-5" style="grid-column:7">금</div>
+        <div class="dn" id="dn-1-6" style="grid-column:8">토</div>
+
+        <div class="dd" id="dd-1-0" style="grid-column:2">-</div>
+        <div class="dd" id="dd-1-1" style="grid-column:3">-</div>
+        <div class="dd" id="dd-1-2" style="grid-column:4">-</div>
+        <div class="dd" id="dd-1-3" style="grid-column:5">-</div>
+        <div class="dd" id="dd-1-4" style="grid-column:6">-</div>
+        <div class="dd" id="dd-1-5" style="grid-column:7">-</div>
+        <div class="dd" id="dd-1-6" style="grid-column:8">-</div>
+
+        <div class="pd" style="grid-column:2"><div class="pd-dot" id="pd-1-0"></div></div>
+        <div class="pd" style="grid-column:3"><div class="pd-dot" id="pd-1-1"></div></div>
+        <div class="pd" style="grid-column:4"><div class="pd-dot" id="pd-1-2"></div></div>
+        <div class="pd" style="grid-column:5"><div class="pd-dot" id="pd-1-3"></div></div>
+        <div class="pd" style="grid-column:6"><div class="pd-dot" id="pd-1-4"></div></div>
+        <div class="pd" style="grid-column:7"><div class="pd-dot" id="pd-1-5"></div></div>
+        <div class="pd" style="grid-column:8"><div class="pd-dot" id="pd-1-6"></div></div>
+
+        <div class="sl default" id="sl-1-0-5" style="grid-column:2;grid-row:5"></div>
+        <div class="sl default" id="sl-1-1-5" style="grid-column:3;grid-row:5"></div>
+        <div class="sl default" id="sl-1-2-5" style="grid-column:4;grid-row:5"></div>
+        <div class="sl default" id="sl-1-3-5" style="grid-column:5;grid-row:5"></div>
+        <div class="sl default" id="sl-1-4-5" style="grid-column:6;grid-row:5"></div>
+        <div class="sl default" id="sl-1-5-5" style="grid-column:7;grid-row:5"></div>
+        <div class="sl default" id="sl-1-6-5" style="grid-column:8;grid-row:5"></div>
+
+        <div class="sl default" id="sl-1-0-6" style="grid-column:2;grid-row:6"></div>
+        <div class="sl default" id="sl-1-1-6" style="grid-column:3;grid-row:6"></div>
+        <div class="sl default" id="sl-1-2-6" style="grid-column:4;grid-row:6"></div>
+        <div class="sl default" id="sl-1-3-6" style="grid-column:5;grid-row:6"></div>
+        <div class="sl default" id="sl-1-4-6" style="grid-column:6;grid-row:6"></div>
+        <div class="sl default" id="sl-1-5-6" style="grid-column:7;grid-row:6"></div>
+        <div class="sl default" id="sl-1-6-6" style="grid-column:8;grid-row:6"></div>
+
+        <div class="sl default" id="sl-1-0-7" style="grid-column:2;grid-row:7"></div>
+        <div class="sl default" id="sl-1-1-7" style="grid-column:3;grid-row:7"></div>
+        <div class="sl default" id="sl-1-2-7" style="grid-column:4;grid-row:7"></div>
+        <div class="sl default" id="sl-1-3-7" style="grid-column:5;grid-row:7"></div>
+        <div class="sl default" id="sl-1-4-7" style="grid-column:6;grid-row:7"></div>
+        <div class="sl default" id="sl-1-5-7" style="grid-column:7;grid-row:7"></div>
+        <div class="sl default" id="sl-1-6-7" style="grid-column:8;grid-row:7"></div>
+
+        <!-- + 슬롯 row8 -->
+        <div style="grid-column:1;grid-row:8"></div>
+        <div class="sl-plus" id="sl-1-0-8" style="grid-column:2;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-1-1-8" style="grid-column:3;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-1-2-8" style="grid-column:4;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-1-3-8" style="grid-column:5;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-1-4-8" style="grid-column:6;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-1-5-8" style="grid-column:7;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-1-6-8" style="grid-column:8;grid-row:8"><span class="sl-plus-txt">+</span></div>
+      </div>
+    </div>
+
+    <hr class="week-divider">
+
+    <!-- ══ WEEK 2 ══ -->
+    <div class="week-section">
+      <div class="cal-grid">
+        <div class="week-label" id="wlabel-2">W00</div>
+        <div class="dd-spacer"></div>
+        <div class="tl" style="grid-row:5">오전</div>
+        <div class="tl" style="grid-row:6">오후</div>
+        <div class="tl" style="grid-row:7">저녁</div>
+
+        <div class="dn" id="dn-2-0" style="grid-column:2">일</div>
+        <div class="dn" id="dn-2-1" style="grid-column:3">월</div>
+        <div class="dn" id="dn-2-2" style="grid-column:4">화</div>
+        <div class="dn" id="dn-2-3" style="grid-column:5">수</div>
+        <div class="dn" id="dn-2-4" style="grid-column:6">목</div>
+        <div class="dn" id="dn-2-5" style="grid-column:7">금</div>
+        <div class="dn" id="dn-2-6" style="grid-column:8">토</div>
+
+        <div class="dd" id="dd-2-0" style="grid-column:2">-</div>
+        <div class="dd" id="dd-2-1" style="grid-column:3">-</div>
+        <div class="dd" id="dd-2-2" style="grid-column:4">-</div>
+        <div class="dd" id="dd-2-3" style="grid-column:5">-</div>
+        <div class="dd" id="dd-2-4" style="grid-column:6">-</div>
+        <div class="dd" id="dd-2-5" style="grid-column:7">-</div>
+        <div class="dd" id="dd-2-6" style="grid-column:8">-</div>
+
+        <div class="pd" style="grid-column:2"><div class="pd-dot" id="pd-2-0"></div></div>
+        <div class="pd" style="grid-column:3"><div class="pd-dot" id="pd-2-1"></div></div>
+        <div class="pd" style="grid-column:4"><div class="pd-dot" id="pd-2-2"></div></div>
+        <div class="pd" style="grid-column:5"><div class="pd-dot" id="pd-2-3"></div></div>
+        <div class="pd" style="grid-column:6"><div class="pd-dot" id="pd-2-4"></div></div>
+        <div class="pd" style="grid-column:7"><div class="pd-dot" id="pd-2-5"></div></div>
+        <div class="pd" style="grid-column:8"><div class="pd-dot" id="pd-2-6"></div></div>
+
+        <div class="sl default" id="sl-2-0-5" style="grid-column:2;grid-row:5"></div>
+        <div class="sl default" id="sl-2-1-5" style="grid-column:3;grid-row:5"></div>
+        <div class="sl default" id="sl-2-2-5" style="grid-column:4;grid-row:5"></div>
+        <div class="sl default" id="sl-2-3-5" style="grid-column:5;grid-row:5"></div>
+        <div class="sl default" id="sl-2-4-5" style="grid-column:6;grid-row:5"></div>
+        <div class="sl default" id="sl-2-5-5" style="grid-column:7;grid-row:5"></div>
+        <div class="sl default" id="sl-2-6-5" style="grid-column:8;grid-row:5"></div>
+
+        <div class="sl default" id="sl-2-0-6" style="grid-column:2;grid-row:6"></div>
+        <div class="sl default" id="sl-2-1-6" style="grid-column:3;grid-row:6"></div>
+        <div class="sl default" id="sl-2-2-6" style="grid-column:4;grid-row:6"></div>
+        <div class="sl default" id="sl-2-3-6" style="grid-column:5;grid-row:6"></div>
+        <div class="sl default" id="sl-2-4-6" style="grid-column:6;grid-row:6"></div>
+        <div class="sl default" id="sl-2-5-6" style="grid-column:7;grid-row:6"></div>
+        <div class="sl default" id="sl-2-6-6" style="grid-column:8;grid-row:6"></div>
+
+        <div class="sl default" id="sl-2-0-7" style="grid-column:2;grid-row:7"></div>
+        <div class="sl default" id="sl-2-1-7" style="grid-column:3;grid-row:7"></div>
+        <div class="sl default" id="sl-2-2-7" style="grid-column:4;grid-row:7"></div>
+        <div class="sl default" id="sl-2-3-7" style="grid-column:5;grid-row:7"></div>
+        <div class="sl default" id="sl-2-4-7" style="grid-column:6;grid-row:7"></div>
+        <div class="sl default" id="sl-2-5-7" style="grid-column:7;grid-row:7"></div>
+        <div class="sl default" id="sl-2-6-7" style="grid-column:8;grid-row:7"></div>
+
+        <!-- + 슬롯 row8 -->
+        <div style="grid-column:1;grid-row:8"></div>
+        <div class="sl-plus" id="sl-2-0-8" style="grid-column:2;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-2-1-8" style="grid-column:3;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-2-2-8" style="grid-column:4;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-2-3-8" style="grid-column:5;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-2-4-8" style="grid-column:6;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-2-5-8" style="grid-column:7;grid-row:8"><span class="sl-plus-txt">+</span></div>
+        <div class="sl-plus" id="sl-2-6-8" style="grid-column:8;grid-row:8"><span class="sl-plus-txt">+</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 오버레이 -->
+<div class="sheet-overlay" id="overlay" onclick="closeSheet()"></div>
+
+<!-- 바텀 시트 -->
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-head">
+    <div>
+      <div class="sheet-date" id="sheet-date"></div>
+      <div class="sheet-time" id="sheet-time"></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="period-toggle" id="period-btn" onclick="togglePeriod()">
+        <div class="dot-inner"></div>
+      </button>
+      <button class="sheet-btn confirm" onclick="confirmSlot()">✓</button>
+      <button class="sheet-btn cancel"  onclick="closeSheet()">✕</button>
+    </div>
+  </div>
+
+  <div class="sheet-row" id="row1">
+    <div class="sheet-row-label">유형</div>
+    <div class="sheet-chips">
+      <div class="chip" id="chip-booked" onclick="selectType('booked')">Booked</div>
+      <div class="chip" id="chip-free"   onclick="selectType('free')">Free</div>
+    </div>
+  </div>
+
+  <div class="sheet-row hidden" id="row2">
+    <div class="sheet-row-label">세부</div>
+    <div class="sheet-chips" id="detail-chips"></div>
+  </div>
+</div>
+
+<!-- 탭바 -->
+<div class="tabbar">
+  <div class="tab-item active">
+    <svg viewBox="0 0 26 26" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="20" height="19" rx="2"/>
+      <path d="M3 10h20M8 2v4M18 2v4"/>
+      <path d="M9 15l2.5 2.5L17 12"/>
+    </svg>
+  </div>
+  <div class="tab-item" onclick="location.href='steady-log.html'">
+    <svg viewBox="0 0 26 26" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="5" cy="7"  r="1.5"/>
+      <line x1="9" y1="7"  x2="22" y2="7"/>
+      <circle cx="5" cy="13" r="1.5"/>
+      <line x1="9" y1="13" x2="22" y2="13"/>
+      <circle cx="5" cy="19" r="1.5"/>
+      <line x1="9" y1="19" x2="18" y2="19"/>
+    </svg>
+  </div>
+  <div class="tab-item" onclick="location.href='steady-memo.html'">
+    <svg viewBox="0 0 26 26" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 3H6a2 2 0 00-2 2v16a2 2 0 002 2h14a2 2 0 002-2V9l-7-6z"/>
+      <path d="M15 3v6h7"/>
+    </svg>
+  </div>
+</div>
+
+<script>
+  function getISOWeek(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const ys = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - ys) / 86400000) + 1) / 7);
+  }
+  function getMondayOfWeek(date) {
+    const d = new Date(date); d.setHours(0,0,0,0);
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    return d;
+  }
+  function getWeekDates(monday) {
+    const sun = new Date(monday); sun.setDate(sun.getDate() - 1);
+    return Array.from({length:7}, (_,i) => { const d=new Date(sun); d.setDate(sun.getDate()+i); return d; });
+  }
+  function dateKey(d) {
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+
+  const DAYS  = ['일','월','화','수','목','금','토'];
+  const TIMES = {5:'오전', 6:'오후', 7:'저녁'};
+  const CLASS_MAP = {
+    work:{type:'booked',sub:'work'}, plans:{type:'booked',sub:'plans'},
+    cardio:{type:'free',sub:'cardio'}, strength:{type:'free',sub:'strength'}, recovery:{type:'free',sub:'recovery'}
+  };
+  const BOOKED_OPTS = [{cls:'work',label:'근무'},{cls:'plans',label:'일정'}];
+  const FREE_OPTS   = [
+    {cls:'cardio',label:'🏃 러닝'},{cls:'cardio',label:'🚶 걷기'},{cls:'cardio',label:'🏊 수영'},
+    {cls:'strength',label:'🏋️ 웨이트'},{cls:'strength',label:'💪 맨몸운동'},
+    {cls:'recovery',label:'🧘 스트레칭'},{cls:'recovery',label:'😴 휴식'}
+  ];
+  // + 슬롯 전용: Booked 없이 활동만
+  const PLUS_OPTS = [
+    {cls:'cardio',label:'🏃 러닝'},{cls:'cardio',label:'🚶 걷기'},{cls:'cardio',label:'🏊 수영'},
+    {cls:'strength',label:'🏋️ 웨이트'},{cls:'strength',label:'💪 맨몸운동'},
+    {cls:'recovery',label:'🧘 스트레칭'}
+  ];
+
+  function saveSlot(d, row, cls, label) {
+    try { localStorage.setItem('sl_'+dateKey(d)+'_'+row, JSON.stringify({cls,label})); } catch(e){}
+  }
+  function loadSlot(d, row) {
+    try { const v=localStorage.getItem('sl_'+dateKey(d)+'_'+row); return v?JSON.parse(v):null; } catch(e){return null;}
+  }
+  function savePeriod(d, val) {
+    try { localStorage.setItem('pd_'+dateKey(d), val?'1':'0'); } catch(e){}
+  }
+  function loadPeriod(d) {
+    try { return localStorage.getItem('pd_'+dateKey(d))==='1'; } catch(e){return false;}
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const mon1  = getMondayOfWeek(today);
+  const mon0  = new Date(mon1); mon0.setDate(mon1.getDate()-7);
+  const mon2  = new Date(mon1); mon2.setDate(mon1.getDate()+7);
+  const allMons  = [mon0, mon1, mon2];
+  const allDates = [getWeekDates(mon0), getWeekDates(mon1), getWeekDates(mon2)];
+
+  // ── 다중선택 상태 ──────────────────────────
+  let multiMode = false;
+  // selectedSlots: [{el, dateObj, row}, ...]
+  let selectedSlots = [];
+
+  function enterMultiSelect(sl, dateObj, row) {
+    multiMode = true;
+    selectedSlots = [];
+    document.getElementById('ms-bar').classList.add('on');
+    addToSelection(sl, dateObj, row);
+  }
+
+  function exitMultiSelect() {
+    multiMode = false;
+    selectedSlots.forEach(s => s.el.classList.remove('selected'));
+    selectedSlots = [];
+    document.getElementById('ms-bar').classList.remove('on');
+    document.getElementById('ms-label').textContent = '0개 선택됨';
+  }
+
+  function addToSelection(sl, dateObj, row) {
+    const idx = selectedSlots.findIndex(s => s.el === sl);
+    if (idx >= 0) {
+      sl.classList.remove('selected');
+      selectedSlots.splice(idx, 1);
+    } else {
+      sl.classList.add('selected');
+      selectedSlots.push({el: sl, dateObj, row});
+    }
+    const n = selectedSlots.length;
+    document.getElementById('ms-label').textContent = n + '개 선택됨';
+    if (n === 0) { exitMultiSelect(); return; }
+  }
+
+  function openMultiSheet() {
+    if (selectedSlots.length === 0) return;
+    // 시트를 다중선택 모드로
+    document.getElementById('sheet').classList.add('multi');
+    document.getElementById('sheet-date').textContent = selectedSlots.length + '개 슬롯 선택됨';
+    document.getElementById('sheet-time').textContent = '동일 내용 일괄 입력';
+
+    selType = selSub = selLabel = null;
+    activePeriod = false;
+    ['chip-booked','chip-free'].forEach(id => document.getElementById(id).className='chip');
+    document.getElementById('row2').classList.add('hidden');
+    document.getElementById('detail-chips').innerHTML='';
+    document.getElementById('period-btn').classList.remove('active');
+
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('sheet').classList.add('open');
+  }
+
+  function renderCalendar() {
+    allDates.forEach((dates, wi) => {
+      const wnum = getISOWeek(allMons[wi]);
+      document.getElementById('wlabel-'+wi).textContent = 'W'+String(wnum).padStart(2,'0');
+
+      dates.forEach((d, i) => {
+        const isToday = d.getTime()===today.getTime();
+        const dn = document.getElementById('dn-'+wi+'-'+i);
+        dn.textContent = DAYS[d.getDay()];
+        dn.className = 'dn'+(isToday?' tc':'');
+        const dd = document.getElementById('dd-'+wi+'-'+i);
+        dd.textContent = d.getDate()===1 ? (d.getMonth()+1)+'/1' : String(d.getDate());
+        dd.className = 'dd'+(isToday?' today':'');
+        const dot = document.getElementById('pd-'+wi+'-'+i);
+        if (dot) dot.classList.toggle('on', loadPeriod(d));
+        [5,6,7,8].forEach(row => {
+          const sl = document.getElementById('sl-'+wi+'-'+i+'-'+row);
+          if (!sl) return;
+          const sv = loadSlot(d, row);
+          if (row === 8) {
+            if (sv && sv.cls) {
+              sl.className = 'sl-plus '+sv.cls;
+              sl.innerHTML = '<span class="sl-plus-txt">'+sv.label+'</span>';
+            } else {
+              sl.className = 'sl-plus';
+              sl.innerHTML = '<span class="sl-plus-txt">+</span>';
+            }
+          } else {
+            if (sv && sv.cls) {
+              sl.className = 'sl '+sv.cls;
+              sl.innerHTML = sv.label ? '<span class="sl-txt">'+sv.label+'</span>' : '';
+            } else {
+              sl.className = 'sl default'; sl.innerHTML = '';
+            }
+          }
+
+          // 롱프레스 타이머
+          let pressTimer = null;
+          let longPressed = false;
+
+          sl.addEventListener('mousedown', () => {
+            longPressed = false;
+            pressTimer = setTimeout(() => {
+              longPressed = true;
+              pressTimer = null;
+              if (!multiMode) enterMultiSelect(sl, d, row);
+              else addToSelection(sl, d, row);
+            }, 500);
+          });
+          sl.addEventListener('touchstart', () => {
+            longPressed = false;
+            pressTimer = setTimeout(() => {
+              longPressed = true;
+              pressTimer = null;
+              if (!multiMode) enterMultiSelect(sl, d, row);
+              else addToSelection(sl, d, row);
+            }, 500);
+          }, {passive:true});
+          sl.addEventListener('mouseup',    () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+          sl.addEventListener('mouseleave', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+          sl.addEventListener('touchend',   () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+
+          sl.addEventListener('click', () => {
+            if (longPressed) { longPressed = false; return; }
+            if (multiMode) {
+              addToSelection(sl, d, row);
+            } else {
+              openSheet(sl, d, row);
+            }
+          });
+        });
+      });
+    });
+  }
+
+  // ── 바텀 시트 ─────────────────────────────
+  let activeSlot=null, activeDateObj=null, activeRow=null;
+  let selType=null, selSub=null, selLabel=null;
+  let activePeriod=false;
+
+  function openSheet(sl, dateObj, row) {
+    activeSlot=sl; activeDateObj=dateObj; activeRow=row;
+    selType=selSub=selLabel=null;
+    document.getElementById('sheet').classList.remove('multi');
+    const isPlus = (row === 8);
+
+    document.getElementById('sheet-date').textContent =
+      (dateObj.getMonth()+1)+'월 '+dateObj.getDate()+'일 ('+DAYS[dateObj.getDay()]+')';
+    document.getElementById('sheet-time').textContent = isPlus ? '+ 추가' : TIMES[row];
+
+    activePeriod = loadPeriod(dateObj);
+    document.getElementById('period-btn').classList.toggle('active', activePeriod);
+    // + 슬롯은 생리버튼 숨김
+    document.getElementById('period-btn').style.display = isPlus ? 'none' : '';
+
+    if (isPlus) {
+      // 유형 행 숨기고 바로 PLUS_OPTS 표시
+      document.getElementById('row1').classList.add('hidden');
+      const ex = getSlotState(sl);
+      if (ex) { selType='free'; selSub=ex.cls; selLabel=ex.label; }
+      showPlusDetail(ex ? ex.cls : null, ex ? ex.label : null);
+    } else {
+      document.getElementById('row1').classList.remove('hidden');
+      ['chip-booked','chip-free'].forEach(id=>document.getElementById(id).className='chip');
+      const ex = getSlotState(sl);
+      if (ex) {
+        selType=ex.type; selSub=ex.cls; selLabel=ex.label;
+        document.getElementById('chip-'+ex.type).className='chip sel-'+ex.type;
+        showDetail(ex.type, ex.cls, ex.label);
+      } else {
+        document.getElementById('row2').classList.add('hidden');
+        document.getElementById('detail-chips').innerHTML='';
+      }
+    }
+
+    document.getElementById('overlay').classList.add('open');
+    document.getElementById('sheet').classList.add('open');
+  }
+
+  function showPlusDetail(activeCls, activeLabel) {
+    const cont = document.getElementById('detail-chips');
+    cont.innerHTML='';
+    PLUS_OPTS.forEach(opt => {
+      const c = document.createElement('div');
+      const isActive = activeLabel ? opt.label===activeLabel : false;
+      c.className='chip'+(isActive?' sel-'+opt.cls:'');
+      c.textContent=opt.label;
+      c.onclick=()=>pickDetail(opt.cls,opt.label);
+      cont.appendChild(c);
+    });
+    document.getElementById('row2').classList.remove('hidden');
+    selType = 'free';
+  }
+
+  function getSlotState(sl) {
+    const base = sl.className.replace('selected','').trim();
+    // sl-plus
+    if (base.startsWith('sl-plus')) {
+      const cls = base.replace('sl-plus','').trim();
+      if (!cls) return null;
+      const map = CLASS_MAP[cls]; if(!map) return null;
+      const txt = sl.querySelector('.sl-plus-txt');
+      const label = txt ? txt.textContent : '';
+      if (label === '+') return null;
+      return {type:map.type, cls, label};
+    }
+    const cls = base.replace('sl','').trim();
+    if (!cls||cls==='default') return null;
+    const map = CLASS_MAP[cls]; if(!map) return null;
+    const txt = sl.querySelector('.sl-txt');
+    return {type:map.type, cls, label:txt?txt.textContent:''};
+  }
+
+  function selectType(type) {
+    selType=type; selSub=selLabel=null;
+    ['chip-booked','chip-free'].forEach(id=>document.getElementById(id).className='chip');
+    document.getElementById('chip-'+type).className='chip sel-'+type;
+    showDetail(type,null,null);
+  }
+
+  function showDetail(type, activeCls, activeLabel) {
+    const opts = type==='booked'?BOOKED_OPTS:FREE_OPTS;
+    const cont = document.getElementById('detail-chips');
+    cont.innerHTML='';
+    opts.forEach((opt,i) => {
+      // Free일 때 스트레칭(index 5) 앞에 줄바꿈
+      if (type==='free' && i===5) {
+        const br = document.createElement('div');
+        br.style.cssText='width:100%;height:0;flex-basis:100%';
+        cont.appendChild(br);
+      }
+      const c = document.createElement('div');
+      const isActive = activeLabel ? opt.label===activeLabel : (activeCls&&type==='booked'&&opt.cls===activeCls);
+      c.className='chip'+(isActive?' sel-'+opt.cls:'');
+      c.textContent=opt.label;
+      c.onclick=()=>pickDetail(opt.cls,opt.label);
+      cont.appendChild(c);
+    });
+    document.getElementById('row2').classList.remove('hidden');
+  }
+
+  function pickDetail(cls, label) {
+    selSub=cls; selLabel=label;
+    document.querySelectorAll('#detail-chips .chip').forEach(c=>{
+      c.className='chip'+(c.textContent===label?' sel-'+cls:'');
+    });
+  }
+
+  function togglePeriod() {
+    activePeriod = !activePeriod;
+    document.getElementById('period-btn').classList.toggle('active', activePeriod);
+  }
+
+  function confirmSlot() {
+    if (!activeSlot && selectedSlots.length === 0) { closeSheet(); return; }
+
+    const disp = selLabel ? selLabel.replace(/^\S+\s+/,'') : '';
+
+    if (multiMode && selectedSlots.length > 0) {
+      // 다중선택 일괄 적용
+      selectedSlots.forEach(s => {
+        if (selSub) {
+          s.el.className = 'sl ' + selSub;
+          s.el.innerHTML = disp ? '<span class="sl-txt">'+disp+'</span>' : '';
+          saveSlot(s.dateObj, s.row, selSub, disp);
+        }
+      });
+      exitMultiSelect();
+    } else if (activeSlot) {
+      // 단일 적용
+      if (selSub) {
+        activeSlot.className = 'sl '+selSub;
+        activeSlot.innerHTML = disp ? '<span class="sl-txt">'+disp+'</span>' : '';
+        saveSlot(activeDateObj, activeRow, selSub, disp);
+      }
+      savePeriod(activeDateObj, activePeriod);
+      allDates.forEach((dates, wi) => {
+        dates.forEach((d, i) => {
+          if (d.getTime()===activeDateObj.getTime()) {
+            const dot = document.getElementById('pd-'+wi+'-'+i);
+            if (dot) dot.classList.toggle('on', activePeriod);
+          }
+        });
+      });
+    }
+    closeSheet();
+  }
+
+  function closeSheet() {
+    document.getElementById('overlay').classList.remove('open');
+    document.getElementById('sheet').classList.remove('open');
+    document.getElementById('sheet').classList.remove('multi');
+    document.getElementById('row1').classList.remove('hidden');
+    activeSlot = null;
+    if (multiMode) {
+      // 시트만 닫고 선택은 유지
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    renderCalendar();
+    const sections = document.querySelectorAll('.week-section');
+    if (sections[1]) setTimeout(() => sections[1].scrollIntoView({behavior:'instant', block:'start'}), 50);
+  });
+</script>
+</body>
+</html>
