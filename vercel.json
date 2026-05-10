@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/calendar",
+      "destination": "/steady-calendar.html"
+    },
+    {
+      "source": "/log",
+      "destination": "/steady-log.html"
+    },
+    {
+      "source": "/memo",
+      "destination": "/steady-memo.html"
+    }
+  ]
+}
