@@ -577,7 +577,7 @@
       const sections = container.querySelectorAll('.week-section');
       const thisWeek = [...sections].find(s => s.dataset.woffset == '0');
       if (thisWeek) {
-        thisWeek.scrollIntoView({behavior:'instant', block:'start'});
+        thisWeek.scrollIntoView({behavior:'instant', block:'center'});
       }
     }, 50);
   }
