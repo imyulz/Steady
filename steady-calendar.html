@@ -2,9 +2,6 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Steady</title>
   <link rel="manifest" href="/manifest.json">
@@ -566,15 +563,24 @@
   function initCalendar() {
     const container = document.getElementById('cal-container');
     container.innerHTML = '';
-    renderedMin = -(PRELOAD);
-    renderedMax = -(PRELOAD);
 
-    // 이전 4주 ~ 다음 4주 (총 9주)
-    for (let i = 0; i <= PRELOAD*2; i++) {
-      if (i > 0) container.appendChild(buildDivider());
-      container.appendChild(buildWeekSection(renderedMin + i));
+    // 시작일: 2026-04-26 (W18) 고정
+    const startDate = new Date(2026, 3, 26);
+    const startMon  = getMondayOfWeek(startDate);
+    // 시작 오프셋 계산 (이번주 대비 몇 주 전인지)
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const startOffset = Math.round((startMon - todayMon) / msPerWeek);
+
+    renderedMin = startOffset;
+    renderedMax = startOffset;
+
+    // W18부터 이번주+4주까지 렌더
+    const endOffset = PRELOAD;
+    for (let i = startOffset; i <= endOffset; i++) {
+      if (i > startOffset) container.appendChild(buildDivider());
+      container.appendChild(buildWeekSection(i));
+      renderedMax = i + 1;
     }
-    renderedMax = renderedMin + PRELOAD*2 + 1;
 
     // 이번주 섹션으로 스크롤
     setTimeout(() => {
