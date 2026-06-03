@@ -529,23 +529,24 @@
   function prependWeeks(count) {
     const container = document.getElementById('cal-container');
     const scroll    = document.getElementById('scroll');
-    const prevH     = container.scrollHeight;
 
-    const frag = document.createDocumentFragment();
+    // 현재 스크롤 기준점 저장
+    const anchor    = container.firstElementChild;
+    const anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
+
     for (let i = 0; i < count; i++) {
       renderedMin--;
-      frag.appendChild(buildDivider());
-      frag.appendChild(buildWeekSection(renderedMin));
+      const divider = buildDivider();
+      const section = buildWeekSection(renderedMin);
+      container.insertBefore(divider, container.firstChild);
+      container.insertBefore(section, divider);
     }
-    // 맨 앞에 삽입
-    const first = container.firstChild;
-    // divider가 맨 처음에 불필요하면 제거
-    const nodes = [...frag.childNodes];
-    nodes.reverse().forEach(n => container.insertBefore(n.cloneNode(true), container.firstChild));
 
-    // 스크롤 위치 보정 (위로 추가했으므로)
-    const added = container.scrollHeight - prevH;
-    scroll.scrollTop += added;
+    // 삽입 후 anchor 위치 복원 (스크롤 점프 방지)
+    if (anchor) {
+      const newTop = anchor.getBoundingClientRect().top;
+      scroll.scrollTop += (newTop - anchorTop);
+    }
   }
 
   // 아래쪽에 주차 추가
