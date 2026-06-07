@@ -729,6 +729,14 @@
   }
 
   function selectType(type) {
+    // 같은 유형 다시 누르면 취소
+    if (selType === type) {
+      selType=selSub=selLabel=null;
+      ['chip-booked','chip-free'].forEach(id=>document.getElementById(id).className='chip');
+      document.getElementById('row2').classList.add('hidden');
+      document.getElementById('detail-chips').innerHTML='';
+      return;
+    }
     selType=type; selSub=selLabel=null;
     ['chip-booked','chip-free'].forEach(id=>document.getElementById(id).className='chip');
     document.getElementById('chip-'+type).className='chip sel-'+type;
@@ -756,6 +764,14 @@
   }
 
   function pickDetail(cls, label) {
+    // 같은 항목 다시 누르면 취소
+    if (selLabel === label) {
+      selSub=selLabel=null;
+      document.querySelectorAll('#detail-chips .chip').forEach(c=>{
+        c.className='chip';
+      });
+      return;
+    }
     selSub=cls; selLabel=label;
     document.querySelectorAll('#detail-chips .chip').forEach(c=>{
       c.className='chip'+(c.textContent===label?' sel-'+cls:'');
@@ -803,6 +819,10 @@
       if (selSub) {
         updateSlotEl(activeSlot, activeRow, selSub, disp);
         saveSlot(activeDateObj, activeRow, selSub, disp);
+      } else if (selType === null) {
+        // 모두 취소된 경우 → 슬롯 초기화
+        updateSlotEl(activeSlot, activeRow, null, '');
+        try { localStorage.removeItem('sl_'+dateKey(activeDateObj)+'_'+activeRow); } catch(e){}
       }
       // 생리 저장 + 점 업데이트
       savePeriod(activeDateObj, activePeriod);
